@@ -1,0 +1,7 @@
+name = Media Bulk Update
+description = Provides an UI for editing and updating multiple media items with one click.
+core = 7.x
+package = Dennis Distro (Optional)
+php = 5.2.4
+version = 7.x
+dependencies[] = media

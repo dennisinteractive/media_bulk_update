@@ -1,0 +1,138 @@
+<?php
+/**
+ * @file
+ * Code for the Media Bulk Update module.
+ */
+
+/**
+ * Implements hook_menu().
+ */
+function media_bulk_update_menu() {
+  $items['node/%node/media/bulk_update'] = array(
+    'title' => 'Edit media',
+    'page callback' => 'media_bulk_update_media_page_multiedit',
+    'page arguments' => array(1),
+    'access callback' => 'media_bulk_update_multiedit_access',
+    'access arguments' => array(1),
+    'context' => MENU_CONTEXT_PAGE | MENU_CONTEXT_INLINE,
+    'type' => MENU_LOCAL_TASK,
+  );
+  return $items;
+}
+
+/**
+ * Access callback for node/%node/gallery/media menu item.
+ */
+function media_bulk_update_multiedit_access($node) {
+  return (node_access('update', $node) && media_bulk_update_node_supported($node));
+}
+
+/**
+ * Page callback for menu item.
+ */
+function media_bulk_update_media_page_multiedit($node) {
+  $items = $node->field_gallery_files;
+  $file_ids = array();
+  foreach (field_get_items('node', $node, 'field_gallery_files', $items) as $file) {
+    $file_ids[] = $file['fid'];
+  }
+
+  $forms = array();
+  $files = file_load_multiple($file_ids);
+  foreach ($files as $file) {
+    $forms[] = array("file_entity_edit", $file);
+  }
+
+  if (!empty($forms)) {
+    module_load_include('inc', 'file_entity', 'file_entity.pages');
+    if ($form = call_user_func_array('multiform_get_form', $forms)) {
+
+      // Remove the Delete button.
+      unset($form['buttons']['Delete']);
+
+      // Add Cancel button.
+      $form['buttons']['cancel'] = array(
+        '#markup' => l(t('Cancel'), 'node/' . $node->nid),
+        '#weight' => 100,
+      );
+
+
+      foreach ($form['multiform'] as $id => &$form_item) {
+
+        // Show image as thumbnail.
+        $file = file_load($form_item['fid']['#value']);
+        $form_item['preview'] = file_view_file($file, 'thumbnail');
+
+        // Remove buttons from each file form.
+        unset ($form['multiform'][$id]['actions']);
+      }
+
+      drupal_set_title(t('<em>Edit media for</em> @title', array('@title' => $node->title)), PASS_THROUGH);
+
+      // Custom CSS and JS.
+      $form['#attributes']['class'][] = 'media-multiedit-form';
+      $form['#attached']['css'][] = drupal_add_css(drupal_get_path('module', 'media_bulk_update') . '/media_bulk_update.css', array(
+        'group' => 100,
+        'weight' => 100
+      ));
+      $form['#attached']['js'][] = drupal_add_js(drupal_get_path('module', 'media_bulk_update') . '/media_bulk_update.js');
+
+      return $form;
+    }
+  }
+  else {
+    drupal_set_message(t('No files were found on this node.'), 'warning');
+    drupal_goto('node/' . $node->nid);
+  }
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ */
+function media_bulk_update_form_file_entity_edit_alter(&$form, &$form_state) {
+  if (($node = menu_get_object()) && arg(3) == 'bulk_update' && media_bulk_update_node_supported($node)) {
+    // Add a submit callback to change the redirect of the form
+    $form['#submit'][] = 'media_bulk_update_multiedit_form_submit';
+    if (isset($form['actions']['submit']['#submit'])) {
+      $form['actions']['submit']['#submit'][] = 'media_bulk_update_multiedit_form_submit';
+    }
+  }
+}
+
+/**
+ * Submit callback for media edit form so that we redirect back to a logical
+ * page.
+ */
+function media_bulk_update_multiedit_form_submit(&$form, &$form_state) {
+  $form_state['redirect'] = ltrim($form['#action'], '/');
+}
+
+/**
+ * Implements hook_admin_paths().
+ */
+function media_bulk_update_admin_paths() {
+  $paths = array(
+    'node/*/media/bulk_update' => TRUE,
+  );
+  return $paths;
+}
+
+/**
+ * Helper to control which node types are supported.
+ * @param $node.
+ * @returns TRUE or FALSE depending wether the node is supported or not.
+ */
+function media_bulk_update_node_supported($node) {
+  $node_types = module_invoke_all('media_bulk_update_supported_node_types');
+  if (in_array($node->type, $node_types)) {
+    return TRUE;
+  }
+  return FALSE;
+}
+
+/**
+ * Implements hook_media_bulk_update_supported_node_types();
+ */
+function media_bulk_update_media_bulk_update_supported_node_types() {
+  return array('gallery', 'gallery_adv');
+}
