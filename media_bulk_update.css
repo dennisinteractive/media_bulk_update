@@ -3,12 +3,14 @@
     margin-left: 10px;
 }
 
-.page-node-media-bulk-update .media-multiedit-form .file-image-form:nth-child(even) {
+.page-node-media-bulk-update .media-multiedit-form .file-image-form:nth-child(even),
+.page-node-media-bulk-update .media-multiedit-form .file-video-form:nth-child(even){
     background: #efefef;
     padding: 12px;
 }
 
-.page-node-media-bulk-update .media-multiedit-form .file-image-form:nth-child(odd) {
+.page-node-media-bulk-update .media-multiedit-form .file-image-form:nth-child(odd),
+.page-node-media-bulk-update .media-multiedit-form .file-video-form:nth-child(odd){
     background: #d9d9d9;
     padding: 12px;
 }

@@ -57,6 +57,7 @@ function media_bulk_update_media_page_multiedit($node) {
 
     // Remove the Delete button.
     unset($form['buttons']['Delete']);
+    unset($form['buttons']['Add another item']);
 
     // Add Cancel button.
     $form['buttons']['cancel'] = array(
@@ -68,7 +69,8 @@ function media_bulk_update_media_page_multiedit($node) {
       // Show image as thumbnail.
       $file = $files[$form_item['fid']['#value']];
       $form_item['preview'] = file_view_file($file, 'thumbnail');
-
+      $form['multiform'][$id] = _media_bulk_update_unset_non_text_fields($form['multiform'][$id]);
+      
       // Remove buttons from each file form.
       unset($form['multiform'][$id]['actions']);
     }
@@ -91,19 +93,30 @@ function media_bulk_update_media_page_multiedit($node) {
  */
 function media_bulk_update_form_file_entity_edit_alter(&$form, &$form_state) {
   if (($node = menu_get_object()) && arg(3) == 'bulk_update' && media_bulk_update_node_supported($node)) {
-    // Add a submit callback to change the redirect of the form
-    $form['#submit'][] = 'media_bulk_update_multiedit_form_submit';
+    // Add a submit callback to:
+    //  - change the redirect of the form;
+    //  - unset non text fields.
+    array_unshift($form['#submit'], 'media_bulk_update_multiedit_form_submit');
+    $form['#submit'][] = 'media_bulk_unset_non_text_submit';
     if (isset($form['actions']['submit']['#submit'])) {
-      $form['actions']['submit']['#submit'][] = 'media_bulk_update_multiedit_form_submit';
+      array_unshift($form['actions']['submit']['#submit'], 'media_bulk_update_multiedit_form_submit');
+      $form['actions']['submit']['#submit'][] = 'media_bulk_unset_non_text_submit';
     }
   }
+}
+
+/**
+ * Unset unwanted non text fields.
+ */
+function media_bulk_update_multiedit_form_submit(&$form, &$form_state) {
+  $form_state['values'] = _media_bulk_update_unset_non_text_fields($form_state['values']);
 }
 
 /**
  * Submit callback for media edit form so that we redirect back
  * to a logical page.
  */
-function media_bulk_update_multiedit_form_submit(&$form, &$form_state) {
+function media_bulk_unset_non_text_submit(&$form, &$form_state) {
   $form_state['redirect'] = ltrim($form['#action'], '/');
 }
 
@@ -135,4 +148,21 @@ function media_bulk_update_node_supported($node) {
  */
 function media_bulk_update_media_bulk_update_supported_node_types() {
   return array('gallery', 'gallery_adv');
+}
+
+/**
+ * Helper function to unset unwanted non text fields.
+ */
+function _media_bulk_update_unset_non_text_fields($array) {
+  $fields_info = field_info_fields();
+  $supported_field_types = array('image', 'text_long', 'text');
+
+  foreach ($array as $field_name => $field_value) {
+    if (stripos($field_name, 'field_') !== FALSE && isset($fields_info[$field_name]) &&
+      !in_array($fields_info[$field_name]['type'], $supported_field_types)) {
+      unset($array[$field_name]);
+    }
+  }
+
+  return $array;
 }
